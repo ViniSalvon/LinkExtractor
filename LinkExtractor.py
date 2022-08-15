@@ -106,9 +106,8 @@ def inspecionar_elementos(lista, contagem_atual):
 
 # Esta função executa a extração de um link, adicionando-o à lista atual.           (OK)
 def extrair_elemento(endereco, lista_principal, contador):
-    if (endereco.get_attribute('href')) not in lista_principal:
-        lista_principal.append(endereco.get_attribute('href'))
-        contador += 1
+    lista_principal.add(endereco.get_attribute('href'))
+    contador = len(lista_principal)
 
     return lista_principal, contador
 
@@ -163,13 +162,23 @@ def saida(all_data):
     """
     :all_data (list): lista obtida com os dados de saída
     """
+
+    with open(FILENAME, mode='a', newline='') as saida:
+        escritor_csv = csv.writer(saida)
+        for linha in all_data:
+            escritor_csv.writerow([linha])
+
+    '''
     dados_panda = pd.DataFrame()
 
     for j in range(0, len(all_data)):
         d = {'LINKS': all_data[j]}
         dados_panda = dados_panda.append(d, ignore_index=True)
 
-    dados_panda.to_excel('linksExtraidos26.xlsx', index=False)
+    with pd.ExcelWriter('linksExtraidos26.xlsx', mode='a', if_sheet_exists='overlay') as writer:
+        startrow = writer.sheets['Sheet1'].max_row + 1
+        dados_panda.to_excel(writer, index=False, startrow=startrow)'''
+
     print(f'Foram salvos {str(len(all_data))} registros na planilha.')
 
 
@@ -203,10 +212,12 @@ def realiza_pesquisa():
 # Monta a lista caso exista uma única página.       (OK)
 def pesquisa_unica(total_dados):
     contagem = 0
-    lista = []
+    lista = set()
 
-    while contagem < total_dados:
+    while len(lista) < total_dados:
         lista, contagem = inspecionar_elementos(lista, 0)
+
+    lista = tuple(lista)
 
     return lista, contagem
 
@@ -214,14 +225,18 @@ def pesquisa_unica(total_dados):
 # Monta a lista caso exista mais de uma página.         (OK)
 def pesquisa_multipla(total_dados, max_paginas):
     contagem = 0
-    lista = []
+    lista = set()
     pagina_atual = 1
 
-    while contagem < total_dados:
+    while len(lista) < total_dados:
         print(f"Página atual: {pagina_atual}/{max_paginas}")
-        print(f"Contagem atual: {contagem}")
         lista, contagem = inspecionar_elementos(lista, contagem)
         pagina_atual = rotacionar_pagina(pagina_atual, max_paginas)
+
+    if pagina_atual != 1:
+        voltar_pagina_1()
+
+    lista = tuple(lista)
 
     return lista, contagem
 
@@ -229,7 +244,6 @@ def pesquisa_multipla(total_dados, max_paginas):
 # Programa principal. Faz a iteração sobre os dias.     (OK)
 def main():
     contador_global = 0
-    dados_globais = []
 
     for linha in linhas:
 
@@ -253,19 +267,25 @@ def main():
             dados_locais, contagem_local = resultado_pesquisa
             contador_global += contagem_local
 
-            for elemento in dados_locais:
-                dados_globais.append(elemento)
+            saida(dados_locais)
 
             print(f"Foram salvos {contagem_local} registros no dia {linhas2}.")
         else:
             print(f"Não foram encontrado registros no dia {linhas2}.")
 
-    # Monta a lista final após sair do for.
-    saida(dados_globais)
+    print(f"Programa finalizado. Foram salvos um total de {contador_global} dados na planilha.")
 
 
 # Parâmetros iniciais do programa.
 if __name__ == "__main__":
+
+    FILENAME = 'linksExtraidos26.csv'
+    print("Desejas criar um novo arquivo de saída? DADOS ORIGINAIS SERÃO EXCLUÍDOS!! [S/N]")
+    answer = input('OBS: caso o arquivo não exista, escreva S.\n').upper()
+    if answer == "S":
+        criar_arquivo = pd.DataFrame(columns=["LINKS"])
+        criar_arquivo.to_csv(FILENAME, index=False)
+
     # DADOS ENTRADA:
     link = "https://casadosdados.com.br/solucao/cnpj/pesquisa-avancada?id=fUlrvTtLutCXXqoxb7LI6dVP6w7wiugg4L-MWVB2OMU="
     navegador = webdriver.Firefox()
